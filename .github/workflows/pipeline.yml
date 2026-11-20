@@ -10,7 +10,9 @@ on:
         required: false
         type: boolean
         default: true
-
+concurrency:
+  group: shorts-pipeline
+  cancel-in-progress: false
 jobs:
   process-videos:
     runs-on: ubuntu-latest
