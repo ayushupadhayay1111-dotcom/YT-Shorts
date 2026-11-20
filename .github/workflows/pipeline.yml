@@ -1,18 +1,13 @@
 name: YouTube Shorts Automation Pipeline
 
 on:
-  schedule:
-    # 10:00 AM IST (04:30 UTC) every day - Morning run (Asia/Kolkata, UTC+05:30)
-    - cron: "30 4 * * *"
-    # 8:00 PM IST (14:30 UTC) every day - Night run (Asia/Kolkata, UTC+05:30)
-    - cron: "30 14 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
         description: "Dry-run mode (inspect clips & log plan without rendering/uploading)"
         required: false
         type: boolean
-        default: false
+        default: true
 
 concurrency:
   group: shorts-pipeline
