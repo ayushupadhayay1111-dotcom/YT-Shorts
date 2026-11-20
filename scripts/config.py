@@ -131,7 +131,7 @@ LOUDNORM_TARGET_I = float(os.environ.get("LOUDNORM_TARGET_I", "-14.0"))
 # --- YouTube upload defaults ---
 DEFAULT_TAGS = ["shorts", "podcast", "clips"]
 DEFAULT_CATEGORY_ID = "24"      # "Entertainment" — change if needed
-UPLOAD_AS_PRIVATE_FIRST = False  # set True if you want to review before public
+UPLOAD_AS_PRIVATE_FIRST = True  # set True if you want to review before public
 
 # --- Verification / Debug Mode ---
 # When true, runs clip detection and metadata generation and logs the full plan
