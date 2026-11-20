@@ -1,0 +1,81 @@
+name: Ready Short - private upload test
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Check Drive + OAuth only (no upload)'
+        type: boolean
+        default: true
+
+permissions: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Install Google API libraries
+        run: python -m pip install 'google-api-python-client==2.187.0' 'google-auth==2.43.0' 'google-auth-httplib2==0.2.1'
+      - name: Check credentials and optionally upload private video
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          python - <<'PY'
+          import io, json, os, sys
+          from google.oauth2 import service_account
+          from google.oauth2.credentials import Credentials
+          from google.auth.transport.requests import Request
+          from googleapiclient.discovery import build
+          from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
+
+          needed = ['GOOGLE_SERVICE_ACCOUNT_JSON', 'YT_CLIENT_ID', 'YT_CLIENT_SECRET', 'YT_REFRESH_TOKEN']
+          missing = [k for k in needed if not os.environ.get(k)]
+          if missing:
+              sys.exit('Missing GitHub secrets: ' + ', '.join(missing))
+          drive_auth = service_account.Credentials.from_service_account_info(
+              json.loads(os.environ['GOOGLE_SERVICE_ACCOUNT_JSON']),
+              scopes=['https://www.googleapis.com/auth/drive.readonly'])
+          drive = build('drive', 'v3', credentials=drive_auth, cache_discovery=False)
+          file_id = '1DwccgHv_HseHsX1h87tPCta0t1ZDX2Rm'
+          meta = drive.files().get(fileId=file_id, fields='name,size,mimeType').execute()
+          if meta.get('mimeType') != 'video/mp4' or int(meta.get('size', 0)) != 28460195:
+              sys.exit('Unexpected Drive file. Stopping without upload.')
+          with io.FileIO('short.mp4', 'wb') as out:
+              download = MediaIoBaseDownload(out, drive.files().get_media(fileId=file_id))
+              done = False
+              while not done:
+                  _, done = download.next_chunk()
+          if os.path.getsize('short.mp4') != 28460195:
+              sys.exit('Download size mismatch. Stopping without upload.')
+          yt_auth = Credentials(
+              token=None, refresh_token=os.environ['YT_REFRESH_TOKEN'],
+              token_uri='https://oauth2.googleapis.com/token',
+              client_id=os.environ['YT_CLIENT_ID'], client_secret=os.environ['YT_CLIENT_SECRET'])
+          yt_auth.refresh(Request())
+          print('Drive download and OAuth token refresh succeeded.')
+          if os.environ['DRY_RUN'].lower() == 'true':
+              print('DRY RUN: nothing uploaded to YouTube.')
+              sys.exit(0)
+          youtube = build('youtube', 'v3', credentials=yt_auth, cache_discovery=False)
+          body = {
+              'snippet': {
+                  'title': 'IShowSpeed Finds His Name in GTA 6 😭 #Shorts',
+                  'description': 'IShowSpeed spots Watkins Auto Parts during his GTA 6 playthrough and gets emotional. Is it a coincidence? The connection has not been confirmed by Rockstar.\n\nStream: https://www.youtube.com/live/qSyo5d-dVzA\nClip: https://x.com/IShowSpeedHQ/status/2123219509230043508\n\n#IShowSpeed #GTA6 #Gaming #Shorts',
+                  'tags': ['IShowSpeed', 'GTA 6', 'GTA VI', 'gaming', 'shorts'],
+                  'categoryId': '20'
+              },
+              'status': {'privacyStatus': 'private', 'selfDeclaredMadeForKids': False}
+          }
+          request = youtube.videos().insert(
+              part='snippet,status', body=body,
+              media_body=MediaFileUpload('short.mp4', mimetype='video/mp4', resumable=True))
+          result = None
+          while result is None:
+              _, result = request.next_chunk()
+          print('PRIVATE upload complete: https://youtu.be/' + result['id'])
+          PY
