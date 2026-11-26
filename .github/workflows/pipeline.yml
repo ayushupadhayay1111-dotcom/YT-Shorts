@@ -56,6 +56,6 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           DRY_RUN_LOG_ONLY: ${{ inputs.dry_run || 'false' }}
           GITHUB_TRIGGER: ${{ github.event_name }}
-        run: python main.py
+        run: python direct_upload.py
 
 
